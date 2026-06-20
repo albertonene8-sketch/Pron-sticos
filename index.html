@@ -741,7 +741,20 @@ function calcular() {
       }
     });
     
-    const fases=[{fase:'8vos',set:real16,pts:S.p_16vos,label:'Dieciseisavos'},{fase:'4tos',set:real8,pts:S.p_8vos,label:'Octavos'},{fase:'Semis',set:real4,pts:S.p_4tos,label:'Cuartos'},{fase:'Final',set:realSemis,pts:S.p_semis,label:'Semis'}];
+    // Dieciseisavos: usar los clasificados 1º, 2º y 3º de cada grupo
+    if(real16.size>0){
+      'ABCDEFGHIJKL'.split('').forEach(g=>{
+        for(let pos=1;pos<=3;pos++){
+          const equipo=(p.clasificados[g]&&p.clasificados[g][String(pos)])||'';
+          if(!equipo)return;
+          const nt=normalizeTeam(equipo);
+          const hit=real16.has(nt);
+          if(hit)ptsFase+=S.p_16vos;
+          detalles.fase.push({fase:'Dieciseisavos',equipo,pts:hit?S.p_16vos:0,hit});
+        }
+      });
+    }
+    const fases=[{fase:'4tos',set:real8,pts:S.p_8vos,label:'Octavos'},{fase:'Semis',set:real4,pts:S.p_4tos,label:'Cuartos'},{fase:'Final',set:realSemis,pts:S.p_semis,label:'Semis'}];
     fases.forEach(({fase,set,pts,label})=>{(p.fase_final[fase]||[]).forEach(equipo=>{const nt=normalizeTeam(equipo);if(!nt||set.size===0)return;const hit=set.has(nt);if(hit){ptsFase+=pts;} detalles.fase.push({fase:label,equipo,pts:hit?pts:0,hit});});});
     
     (p.fase_final['Final']||[]).forEach(equipo=>{const nt=normalizeTeam(equipo);if(!nt||realFinal.size===0)return;const hit=realFinal.has(nt);if(hit){ptsFase+=S.p_final;} detalles.fase.push({fase:'Final',equipo,pts:hit?S.p_final:0,hit});});

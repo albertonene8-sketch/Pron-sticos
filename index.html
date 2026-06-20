@@ -627,7 +627,7 @@ function buildResultsUI() {
   }
   
   function renderFaseContainers(){
-    const fc=[{id:'16vos',count:16},{id:'8vos',count:8},{id:'4tos',count:4},{id:'semis',count:4},{id:'final',count:2}];
+    const fc=[{id:'16vos',count:32},{id:'8vos',count:16},{id:'4tos',count:8},{id:'semis',count:4},{id:'final',count:2}];
     fc.forEach(f=>{
       const cont=document.getElementById(f.id+'-container');if(!cont)return;
       const ops=getAvailableTeams(f.id);let html='';

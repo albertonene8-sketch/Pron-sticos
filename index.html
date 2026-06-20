@@ -436,13 +436,12 @@ async function loadFromCloud() {
     }
     const record = await res.json();
     realResults = record.resultados || {};
-    rankingCache = record.ranking || [];
     if(record.scoring) {
       for(const k in record.scoring){ const el=document.getElementById(k); if(el) el.value=record.scoring[k]; }
     }
     const ts = record.lastUpdate || '';
     setSyncStatus('ok', ts ? 'Actualizado: '+ts : 'Conectado · sin resultados aún');
-    renderRanking(rankingCache);
+    calcular();
     buildParticipantsGrid();
   } catch(e) {
     console.error('JSONBin error:', e);
@@ -472,7 +471,6 @@ async function saveToCloud() {
 
   const payload = {
     resultados: realResults,
-    ranking: rankingCache,
     scoring: scoring,
     lastUpdate: new Date().toLocaleString('es-ES')
   };

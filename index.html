@@ -701,7 +701,8 @@ function filterParticipants(v){ buildParticipantsGrid(v); }
 // ═══════════════════════════════════════════════════════
 function calcular() {
   collectAllInputs();
- const S=getScoring();
+  const S=getScoring();
+  
   const real16=new Set();for(let i=1;i<=32;i++){const v=realResults['fase_16vos_'+i];if(v)real16.add(normalizeTeam(v));}
   const real8=new Set();for(let i=1;i<=16;i++){const v=realResults['fase_8vos_'+i];if(v)real8.add(normalizeTeam(v));}
   const real4=new Set();for(let i=1;i<=8;i++){const v=realResults['fase_4tos_'+i];if(v)real4.add(normalizeTeam(v));}
@@ -724,13 +725,16 @@ function calcular() {
     let ptsPartidos=0,ptsGrupos=0,ptsFase=0,ptsPremios=0;
     const detalles={partidos:[],grupos:[],fase:[],premios:[]};
     
+    // 1. Partidos
     for(let i=1;i<=72;i++){
       const rr=realResults['m_'+i]||'';const pron=p.partidos[String(i)]||'';
       if(!rr||!pron)continue;
-      const {pts,detail}=scoreMatch(pron,rr,S);
-      ptsPartidos+=pts;detalles.partidos.push({n:i,pron,real:rr,pts,detail});
+      const sc=scoreMatch(pron,rr,S);
+      ptsPartidos+=sc.pts;
+      detalles.partidos.push({n:i,pron,real:rr,pts:sc.pts,detail:sc.detail||''});
     }
     
+    // 2. Grupos
     'ABCDEFGHIJKL'.split('').forEach(g=>{
       for(let pos=1;pos<=3;pos++){
         const pPred=normalizeTeam((p.clasificados[g]&&p.clasificados[g][String(pos)])||'');
@@ -741,11 +745,41 @@ function calcular() {
       }
     });
     
-    const fases=[{fase:'8vos',set:real16,pts:S.p_16vos,label:'Dieciseisavos'},{fase:'4tos',set:real8,pts:S.p_8vos,label:'Octavos'},{fase:'Semis',set:real4,pts:S.p_4tos,label:'Cuartos'},{fase:'Final',set:realSemis,pts:S.p_semis,label:'Semis'}];
-    fases.forEach(({fase,set,pts,label})=>{(p.fase_final[fase]||[]).forEach(equipo=>{const nt=normalizeTeam(equipo);if(!nt||set.size===0)return;const hit=set.has(nt);if(hit){ptsFase+=pts;} detalles.fase.push({fase:label,equipo,pts:hit?pts:0,hit});});});
+    // 3. DIECISEISAVOS (Mapea los 36 equipos y los inyecta todos en el detalle)
+    const pred16 = new Set();
+    'ABCDEFGHIJKL'.split('').forEach(g => {
+      for(let pos=1;pos<=3;pos++){
+        const t = p.clasificados[g] && p.clasificados[g][String(pos)];
+        if(t) pred16.add(t);
+      }
+    });
     
-    (p.fase_final['Final']||[]).forEach(equipo=>{const nt=normalizeTeam(equipo);if(!nt||realFinal.size===0)return;const hit=realFinal.has(nt);if(hit){ptsFase+=S.p_final;} detalles.fase.push({fase:'Final',equipo,pts:hit?S.p_final:0,hit});});
+    pred16.forEach(eq => {
+      const nt = normalizeTeam(eq);
+      const hit = real16.has(nt);
+      if(hit) ptsFase += S.p_16vos;
+      detalles.fase.push({fase:'Dieciseisavos', equipo:eq, pts:hit?S.p_16vos:0, hit:hit});
+    });
     
+    // 4. ELIMINATORIAS DIRECTAS (Lee el JSON y compara con tus claves reales)
+    const fases = [
+      { fase: '8vos',  set: real8,     pts: S.p_8vos,  label: 'Octavos' },
+      { fase: '4tos',  set: real4,     pts: S.p_4tos,  label: 'Cuartos' },
+      { fase: 'Semis', set: realSemis, pts: (S.p_semis || 16), label: 'Semifinales' },
+      { fase: 'Final', set: realFinal, pts: S.p_final, label: 'Final' }
+    ];
+    
+    fases.forEach(({fase,set,pts,label})=>{
+      (p.fase_final[fase]||[]).forEach(equipo=>{
+        const nt=normalizeTeam(equipo);
+        if(!nt)return;
+        const hit=set.has(nt);
+        if(hit) ptsFase+=pts;
+        detalles.fase.push({fase:label, equipo, pts:hit?pts:0, hit:hit});
+      });
+    });
+    
+    // 5. Premios
     const premiosCheck=[
       {pred:normalizeTeam(p.premios['Campeón']||''),real:realCampeon,pts:S.p_campeon,label:'Campeón',rk:'campeon'},
       {pred:normalizeTeam(p.premios['Subcampeón']||''),real:realSub,pts:S.p_sub,label:'Subcampeón',rk:'sub'},
@@ -761,6 +795,7 @@ function calcular() {
     
     results.push({nombre:p.nombre,total:ptsPartidos+ptsGrupos+ptsFase+ptsPremios,ptsPartidos,ptsGrupos,ptsFase,ptsPremios,detalles,key});
   }
+  
   results.sort((a,b)=>b.total-a.total||(b.ptsPremios-a.ptsPremios));
   rankingCache=results;
   renderRanking(results);
@@ -873,126 +908,142 @@ function showDetail(key) {
 }
 
 function showProns(key) {
-  const p = PRONOSTICOS.participants[key];
-  if(!p) return;
-  document.getElementById('modal-title').textContent = '📋 ' + p.nombre + ' — Todos los pronósticos';
+  const p = PRONOSTICOS.participants[key]; if(!p) return;
+  document.getElementById('modal-title').textContent = '📋 ' + p.nombre + ' — Pronósticos Completos';
   let html = '';
 
-  html += `<div class="detail-section">
-    <h4>⚽ Partidos de fase de grupos (72 partidos)</h4>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:3px;margin-top:6px">`;
-  for(let i=1;i<=72;i++){
-    const m=PRONOSTICOS.matches[String(i)];
-    const pron=p.partidos[String(i)]||'—';
-    const real=realResults['m_'+i]||'';
-    let hit=false; let hitClass='';
-    if(real && pron!=='—'){
-      const sc=scoreMatch(pron,real,getScoring());
-      hit=sc.pts>0;
+  // 1. Partidos de Grupos (con colores y banderas)
+  html += `<div class="detail-section"><h4>⚽ Pronósticos Partidos de Grupos</h4>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:6px;max-height:240px;overflow-y:auto;background:var(--card2);padding:10px;border-radius:6px;border:1px solid var(--border);margin-bottom:12px;">`;
+  for(let i=1; i<=72; i++){
+    const m = PRONOSTICOS.matches[String(i)];
+    const pron = p.partidos[String(i)] || '—';
+    const real = realResults['m_'+i] || '—';
+    
+    let bgRow = 'transparent';
+    let borderRow = 'rgba(255,255,255,0.05)';
+    const pParsed = parseScore(pron);
+    const rParsed = parseScore(real);
+    
+    if (pParsed && rParsed) {
+      const exacto = (pParsed[0] === rParsed[0] && pParsed[1] === rParsed[1]);
+      const signo = getSign(pParsed[0], pParsed[1]) === getSign(rParsed[0], rParsed[1]);
+      if (exacto) {
+        bgRow = 'rgba(0, 166, 81, 0.15)'; 
+        borderRow = 'rgba(0, 166, 81, 0.3)';
+      } else if (signo) {
+        bgRow = 'rgba(245, 166, 35, 0.15)'; 
+        borderRow = 'rgba(245, 166, 35, 0.3)';
+      } else {
+        bgRow = 'rgba(232, 65, 66, 0.08)'; 
+        borderRow = 'rgba(232, 65, 66, 0.2)';
+      }
     }
-    hitClass=real?(hit?'hit':'miss'):'';
-    html+=`<div class="detail-row ${hitClass}" style="display:flex;align-items:center;gap:5px;padding:4px 7px">
-      <span style="font-size:0.72rem;color:var(--muted);min-width:16px">${i}.</span>
-      <span style="flex:1;font-size:0.75rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${obtenerBandera(m.equipo1)}${m.equipo1} vs ${obtenerBandera(m.equipo2)}${m.equipo2}</span>
-      <span style="font-family:monospace;font-size:0.8rem;font-weight:700;color:${hitClass==='hit'?'#86efac':hitClass==='miss'?'#f87171':'#7dd4fc'};white-space:nowrap">${pron}</span>
-      ${real?`<span style="font-size:0.65rem;color:var(--muted)">→ ${real}</span>`:''}
+
+    html += `<div style="font-size:0.8rem; background:${bgRow}; border:1px solid ${borderRow}; padding:6px 8px; border-radius:6px; display:flex; justify-content:space-between; align-items:center;">
+      <span style="display:flex; align-items:center; gap:2px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+        <strong style="color:var(--muted); margin-right:4px;">${i}.</strong>
+        ${obtenerBandera(m.equipo1)}${m.equipo1} <span style="color:var(--muted);font-size:0.75rem;margin:0 2px;">vs</span> ${obtenerBandera(m.equipo2)}${m.equipo2}
+      </span>
+      <span style="font-family:monospace; font-weight:700; flex-shrink:0; margin-left:8px;">
+        ${pron} <span style="color:var(--muted); font-weight:400; font-size:0.75rem;">(${real})</span>
+      </span>
     </div>`;
   }
-  html += '</div></div>';
+  html += `</div></div>`;
 
-  html += `<div class="detail-section"><h4>🏆 Clasificados por grupo</h4>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;margin-top:6px">`;
-  'ABCDEFGHIJKL'.split('').forEach(g=>{
-    html+=`<div style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px">
-      <div style="font-size:0.72rem;font-weight:800;color:var(--muted);margin-bottom:5px">GRUPO ${g}</div>`;
-    for(let pos=1;pos<=3;pos++){
-      const pred=(p.clasificados[g]&&p.clasificados[g][String(pos)])||'—';
-      const real=realResults['g_'+g+'_'+pos]||'';
-      const hit=real&&normalizeTeam(pred)===normalizeTeam(real);
-      html+=`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
-        <span class="pos-badge pos-${pos}" style="flex-shrink:0">${pos}º</span>
-        <span style="font-size:0.8rem;font-weight:600;color:${hit?'#86efac':real?'#f87171':'var(--text)'}">${obtenerBandera(pred)}${pred}</span>
-        ${real&&!hit?`<span style="font-size:0.7rem;color:var(--muted)">→ ${real}</span>`:''}
-        ${hit?'<span style="font-size:0.7rem;color:var(--verde)">✓</span>':''}
+  // 2. Posiciones en Grupos
+  html += `<div class="detail-section"><h4>🏆 Posiciones en Grupos</h4>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:12px;">`;
+  'ABCDEFGHIJKL'.split('').forEach(g => {
+    html += `<div style="background:var(--card2);padding:8px;border-radius:6px;border:1px solid var(--border);">
+      <div style="font-size:0.75rem;font-weight:700;color:var(--oro);margin-bottom:4px;">Grupo ${g}</div>`;
+    for(let pos=1; pos<=3; pos++){
+      const predEq = p.clasificados[g] && p.clasificados[g][String(pos)] || '—';
+      const realEq = realResults['g_'+g+'_'+pos] || '—';
+      const hit = (normalizeTeam(predEq) === normalizeTeam(realEq)) && realEq !== '—';
+      const colorEq = realEq !== '—' ? (hit ? '#86efac' : '#f87171') : 'var(--text)';
+      html += `<div style="font-size:0.78rem;color:${colorEq};margin-bottom:2px;">
+        ${pos}º: ${obtenerBandera(predEq)}${predEq} ${hit?'✓':''}
       </div>`;
     }
-    html+='</div>';
+    html += `</div>`;
   });
-  html+='</div></div>';
-  const fasesLabels=[
-    {k:'8vos',label:'Dieciseisavos de final'},
-    {k:'4tos',label:'Octavos de final'},
-    {k:'Semis',label:'Cuartos de final'},
-    {k:'Final',label:'Semifinales / Final'},
+  html += `</div></div>`;
+
+  // 3. Dieciseisavos de final
+  html += `<div class="detail-section"><h4>🥊 Dieciseisavos de final (Clasificados de Grupo)</h4>
+    <div style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:12px;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;">`;
+  
+  const equiposDieciseisavos = new Set();
+  'ABCDEFGHIJKL'.split('').forEach(g => { for(let pos=1;pos<=3;pos++) { const t = p.clasificados[g] && p.clasificados[g][String(pos)]; if(t) equiposDieciseisavos.add(t); } });
+  
+  const realSet16 = new Set(); for (let i = 1; i <= 32; i++) { const v = realResults['fase_16vos_' + i]; if (v) realSet16.add(normalizeTeam(v)); }
+
+  Array.from(equiposDieciseisavos).sort().forEach(eq => {
+    const hit = realSet16.has(normalizeTeam(eq)); const colorEq = realSet16.size > 0 ? (hit ? '#86efac' : '#f87171') : 'var(--text)';
+    html += `<div style="font-size:0.8rem;color:${colorEq}">${obtenerBandera(eq)}${eq} ${hit ? '✓' : ''}</div>`;
+  });
+  html += `</div></div></div>`;
+
+  // 4. Rondas Eliminatorias Directas
+  const fasesLabels = [
+    { k: '8vos',  label: 'Octavos de Final', realKey: '8vos',  max: 16 },
+    { k: '4tos',  label: 'Cuartos de Final', realKey: '4tos',  max: 8 },
+    { k: 'Semis', label: 'Semifinales',     realKey: 'Semis', max: 4 },
+    { k: 'Final', label: 'Final del Torneo',realKey: 'final', max: 2 }
   ];
-  html+=`<div class="detail-section"><h4>🥊 Fase final</h4>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin-top:6px">`;
-  fasesLabels.forEach(({k,label})=>{
-    const equipos=(p.fase_final[k]||[]);
-    if(!equipos.length) return;
-    const realKey=k==='8vos'?'16vos':k==='4tos'?'8vos':k==='Semis'?'4tos':'semis';
-    const realSet=new Set();
-    const max=k==='8vos'?16:k==='4tos'?8:k==='Semis'?4:4;
-    for(let i=1;i<=max;i++){const v=realResults['fase_'+realKey+'_'+i];if(v)realSet.add(normalizeTeam(v));}
-    if(k==='Final'){
-      const fs=new Set();
-      for(let i=1;i<=2;i++){const v=realResults['fase_final_'+i];if(v)fs.add(normalizeTeam(v));}
-      equipos.forEach(eq=>{
-        const nt=normalizeTeam(eq);
-        const inSemis=realSet.has(nt);
-        const inFinal=fs.has(nt);
-        html+=`<div style="display:flex;align-items:center;gap:5px;padding:3px 0">
-          ${obtenerBandera(eq)}<span style="font-size:0.75rem;color:${inFinal?'#86efac':inSemis?'#fbbf24':realSet.size?'#f87171':'var(--text)'}">${eq}</span>
-          ${inFinal?'<span style="font-size:0.65rem;color:var(--verde)">✓ final</span>':inSemis?'<span style="font-size:0.65rem;color:#fbbf24">✓ semis</span>':''}
-        </div>`;
-      });
-      return;
-    }
-    html+=`<div style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px">
-      <div style="font-size:0.72rem;font-weight:800;color:var(--muted);margin-bottom:6px">${label}</div>`;
-    equipos.forEach(eq=>{
-      const nt=normalizeTeam(eq);
-      const hit=realSet.size>0&&realSet.has(nt);
-      html+=`<div style="display:flex;align-items:center;gap:4px;margin-bottom:2px">
-        <span style="width:6px;height:6px;border-radius:50%;background:${hit?'var(--verde)':realSet.size?'#f87171':'var(--muted)'};flex-shrink:0"></span>
-        ${obtenerBandera(eq)}<span style="font-size:0.78rem;color:${hit?'#86efac':realSet.size?'#f87171':'var(--text)'}">${eq}</span>
-      </div>`;
+  html += `<div class="detail-section"><h4>🥊 Rondas Eliminatorias Directas</h4><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin-top:6px;margin-bottom:12px;">`;
+  fasesLabels.forEach(({ k, label, realKey, max }) => {
+    const equipos = (p.fase_final[k] || []); if (!equipos.length) return;
+    const realSet = new Set(); for (let i = 1; i <= max; i++) { const v = realResults['fase_' + realKey + '_' + i]; if (v) realSet.add(normalizeTeam(v)); }
+    html += `<div style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:10px">
+      <div style="font-size:0.75rem;font-weight:800;color:var(--oro);margin-bottom:6px;text-transform:uppercase">${label}</div>`;
+    equipos.forEach(eq => {
+      const hit = realSet.has(normalizeTeam(eq));
+      html += `<div style="font-size:0.8rem;margin-bottom:3px;color:${realSet.size > 0 ? (hit ? '#86efac' : '#f87171') : 'var(--text)'}">${obtenerBandera(eq)}${eq} ${hit ? '✓' : ''}</div>`;
     });
-    html+='</div>';
+    html += `</div>`;
   });
-  html+='</div></div>';
+  html += `</div></div>`;
 
-  const premMap=[
-    {k:'Campeón',rk:'campeon',icon:'🏆'},
-    {k:'Subcampeón',rk:'sub',icon:'🥈'},
-    {k:'3er puesto',rk:'3er',icon:'🥉'},
-    {k:'4to puesto',rk:'4to',icon:'4️⃣'},
-    {k:'Goleador',rk:'goleador',icon:'⚽'},
-    {k:'Portero',rk:'portero',icon:'🧤'},
+  // 5. Premios Especiales (¡Con los iconos integrados aquí!)
+  const premiosCheck = [
+    { label: 'Campeón', icon: '🏆', pred: p.premios['Campeón'] || '—', real: realResults['premio_campeon'] || '—' },
+    { label: 'Subcampeón', icon: '🥈', pred: p.premios['Subcampeón'] || '—', real: realResults['premio_sub'] || '—' },
+    { label: '3er puesto', icon: '🥉', pred: p.premios['3er puesto'] || '—', real: realResults['premio_3er'] || '—' },
+    { label: '4to puesto', icon: '4️⃣', pred: p.premios['4to puesto'] || '—', real: realResults['premio_4to'] || '—' },
+    { label: 'Máx. Goleador', icon: '⚽', pred: p.premios['Goleador'] || '—', real: realResults['premio_goleador'] || '—' },
+    { label: 'Guante de Oro', icon: '🧤', pred: p.premios['Portero'] || '—', real: realResults['premio_portero'] || '—' }
   ];
-  html+=`<div class="detail-section"><h4>🥇 Premios especiales</h4>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;margin-top:6px">`;
-  premMap.forEach(({k,rk,icon})=>{
-    const pred=p.premios[k]||'—';
-    const real=realResults['premio_'+rk]||'';
-    const hit=real&&normalizeTeam(pred)===normalizeTeam(real);
-    html+=`<div style="background:var(--card2);border:1px solid ${hit?'#00a65155':real?'#e8414233':' var(--border)'};border-radius:6px;padding:8px;display:flex;align-items:center;gap:8px">
-      <span style="font-size:1.2rem">${icon}</span>
-      <div>
-        <div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px">${k}</div>
-        <div style="display:flex;align-items:center;gap:4px;">
-          ${obtenerBandera(pred)}<div style="font-size:0.88rem;font-weight:700;color:${hit?'#86efac':real?'#f87171':'var(--text)'}">${pred}</div>
-        </div>
-        ${real&&!hit?`<div style="font-size:0.7rem;color:var(--muted);display:flex;align-items:center;gap:4px;">Real: ${obtenerBandera(real)} ${real}</div>`:''}
+
+  html += `<div class="detail-section"><h4>🥇 Premios Especiales</h4>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:6px;">`;
+  premiosCheck.forEach(premio => {
+    let colorEq = 'var(--text)';
+    let hitMark = '';
+    
+    // Calcula si es acierto/fallo (si ya se introdujo el resultado real)
+    if (premio.real !== '—') {
+        const hit = normalizeTeam(premio.pred) === normalizeTeam(premio.real);
+        colorEq = hit ? '#86efac' : '#f87171'; // Verde o Rojo
+        hitMark = hit ? ' ✓' : '';
+    }
+    
+    // Aquí se inyecta la variable ${premio.icon}
+    html += `<div style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:10px;">
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:4px;text-transform:uppercase;display:flex;align-items:center;gap:6px;">
+        <span style="font-size:1.1rem;">${premio.icon}</span><span>${premio.label}</span>
       </div>
+      <div style="font-size:0.85rem;font-weight:600;color:${colorEq};">${obtenerBandera(premio.pred)}${premio.pred}${hitMark}</div>
     </div>`;
   });
-  html+='</div></div>';
+  html += `</div></div>`;
 
   document.getElementById('modal-body').innerHTML = html;
   document.getElementById('modal').classList.add('open');
 }
-
 document.getElementById('modal').addEventListener('click',e=>{if(e.target===document.getElementById('modal'))closeModal();});
 
 document.addEventListener('click', function(e) {

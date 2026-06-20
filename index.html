@@ -627,7 +627,7 @@ function buildResultsUI() {
   }
   
   function renderFaseContainers(){
-    const fc=[{id:'16vos',count:16},{id:'8vos',count:8},{id:'4tos',count:4},{id:'semis',count:4},{id:'final',count:2}];
+    const fc=[{id:'16vos',count:32},{id:'8vos',count:16},{id:'4tos',count:8},{id:'semis',count:4},{id:'final',count:2}];
     fc.forEach(f=>{
       const cont=document.getElementById(f.id+'-container');if(!cont)return;
       const ops=getAvailableTeams(f.id);let html='';
@@ -920,48 +920,87 @@ function showProns(key) {
   });
   html+='</div></div>';
 
-  const fasesLabels=[
-    {k:'8vos',label:'Dieciseisavos de final'},
-    {k:'4tos',label:'Octavos de final'},
-    {k:'Semis',label:'Cuartos de final'},
-    {k:'Final',label:'Semifinales / Final'},
-  ];
-  html+=`<div class="detail-section"><h4>🥊 Fase final</h4>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin-top:6px">`;
-  fasesLabels.forEach(({k,label})=>{
-    const equipos=(p.fase_final[k]||[]);
-    if(!equipos.length) return;
-    const realKey=k==='8vos'?'16vos':k==='4tos'?'8vos':k==='Semis'?'4tos':'semis';
-    const realSet=new Set();
-    const max=k==='8vos'?16:k==='4tos'?8:k==='Semis'?4:4;
-    for(let i=1;i<=max;i++){const v=realResults['fase_'+realKey+'_'+i];if(v)realSet.add(normalizeTeam(v));}
-    if(k==='Final'){
-      const fs=new Set();
-      for(let i=1;i<=2;i++){const v=realResults['fase_final_'+i];if(v)fs.add(normalizeTeam(v));}
-      equipos.forEach(eq=>{
-        const nt=normalizeTeam(eq);
-        const inSemis=realSet.has(nt);
-        const inFinal=fs.has(nt);
-        html+=`<div style="display:flex;align-items:center;gap:5px;padding:3px 0">
-          ${obtenerBandera(eq)}<span style="font-size:0.75rem;color:${inFinal?'#86efac':inSemis?'#fbbf24':realSet.size?'#f87171':'var(--text)'}">${eq}</span>
-          ${inFinal?'<span style="font-size:0.65rem;color:var(--verde)">✓ final</span>':inSemis?'<span style="font-size:0.65rem;color:#fbbf24">✓ semis</span>':''}
-        </div>`;
-      });
-      return;
+  // ── DIECISEISAVOS: los 1º y 2º de cada grupo pronosticados ──
+  const equipos16 = [];
+  'ABCDEFGHIJKL'.split('').forEach(g => {
+    for(let pos=1; pos<=3; pos++){
+      const eq = (p.clasificados[g] && p.clasificados[g][String(pos)]) || '';
+      if(eq) equipos16.push(eq);
     }
-    html+=`<div style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px">
-      <div style="font-size:0.72rem;font-weight:800;color:var(--muted);margin-bottom:6px">${label}</div>`;
-    equipos.forEach(eq=>{
-      const nt=normalizeTeam(eq);
-      const hit=realSet.size>0&&realSet.has(nt);
-      html+=`<div style="display:flex;align-items:center;gap:4px;margin-bottom:2px">
-        <span style="width:6px;height:6px;border-radius:50%;background:${hit?'var(--verde)':realSet.size?'#f87171':'var(--muted)'};flex-shrink:0"></span>
-        ${obtenerBandera(eq)}<span style="font-size:0.78rem;color:${hit?'#86efac':realSet.size?'#f87171':'var(--text)'}">${eq}</span>
+  });
+  const equipos16Sorted = [...new Set(equipos16)].sort((a,b)=>a.localeCompare(b,'es'));
+  const real16Set = new Set();
+  for(let i=1;i<=16;i++){const v=realResults['fase_16vos_'+i];if(v)real16Set.add(normalizeTeam(v));}
+
+  html += `<div class="detail-section">
+    <h4>🏆 DIECISEISAVOS DE FINAL (CLASIFICADOS DE GRUPO)</h4>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:4px;margin-top:8px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px">`;
+  equipos16Sorted.forEach(eq => {
+    const nt = normalizeTeam(eq);
+    const hit = real16Set.size > 0 && real16Set.has(nt);
+    const miss = real16Set.size > 0 && !real16Set.has(nt);
+    html += `<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:4px;background:${hit?'rgba(0,166,81,0.12)':miss?'rgba(232,65,66,0.07)':'transparent'}">
+      ${obtenerBandera(eq)}
+      <span style="font-size:0.82rem;font-weight:600;color:${hit?'#86efac':miss?'#f87171':'var(--text)'}">${eq}</span>
+      ${hit?'<span style="font-size:0.65rem;color:var(--verde);margin-left:auto">✓</span>':''}
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  // ── RONDAS ELIMINATORIAS DIRECTAS ──
+  html += `<div class="detail-section"><h4>🥊 RONDAS ELIMINATORIAS DIRECTAS</h4>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:8px">`;
+
+  const rondasConfig = [
+    {k:'4tos', label:'OCTAVOS DE FINAL',   realKey:'8vos',  max:8},
+    {k:'Semis',label:'CUARTOS DE FINAL',   realKey:'4tos',  max:4},
+    {k:'Final', label:'SEMIFINALES',        realKey:'semis', max:4},
+  ];
+
+  rondasConfig.forEach(({k, label, realKey, max}) => {
+    const equipos = (p.fase_final[k] || []).slice().sort((a,b)=>a.localeCompare(b,'es'));
+    if(!equipos.length) return;
+    const rSet = new Set();
+    for(let i=1;i<=max;i++){const v=realResults['fase_'+realKey+'_'+i];if(v)rSet.add(normalizeTeam(v));}
+    html += `<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px">
+      <div style="font-size:0.7rem;font-weight:800;color:var(--oro);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">${label}</div>`;
+    equipos.forEach(eq => {
+      const nt = normalizeTeam(eq);
+      const hit = rSet.size > 0 && rSet.has(nt);
+      const miss = rSet.size > 0 && !rSet.has(nt);
+      html += `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid rgba(42,63,85,0.5)">
+        ${obtenerBandera(eq)}
+        <span style="font-size:0.8rem;font-weight:600;color:${hit?'#86efac':miss?'#f87171':'var(--text)'}">${eq}</span>
+        ${hit?'<span style="font-size:0.65rem;color:var(--verde);margin-left:auto">✓</span>':''}
       </div>`;
     });
-    html+='</div>';
+    html += `</div>`;
   });
-  html+='</div></div>';
+
+  // Final aparte
+  const equiposFinal = (p.fase_final['Final'] || []).slice().sort((a,b)=>a.localeCompare(b,'es'));
+  if(equiposFinal.length){
+    const finalSet = new Set();
+    for(let i=1;i<=2;i++){const v=realResults['fase_final_'+i];if(v)finalSet.add(normalizeTeam(v));}
+    const semiSet = new Set();
+    for(let i=1;i<=4;i++){const v=realResults['fase_semis_'+i];if(v)semiSet.add(normalizeTeam(v));}
+    html += `<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px">
+      <div style="font-size:0.7rem;font-weight:800;color:var(--oro);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">FINAL</div>`;
+    equiposFinal.forEach(eq => {
+      const nt = normalizeTeam(eq);
+      const inFinal = finalSet.size > 0 && finalSet.has(nt);
+      const inSemis = semiSet.size > 0 && semiSet.has(nt);
+      const miss = semiSet.size > 0 && !semiSet.has(nt);
+      html += `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid rgba(42,63,85,0.5)">
+        ${obtenerBandera(eq)}
+        <span style="font-size:0.8rem;font-weight:600;color:${inFinal?'#86efac':inSemis?'#fbbf24':miss?'#f87171':'var(--text)'}">${eq}</span>
+        ${inFinal?'<span style="font-size:0.65rem;color:var(--verde);margin-left:auto">✓ final</span>':inSemis?'<span style="font-size:0.65rem;color:#fbbf24;margin-left:auto">✓ semis</span>':''}
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  html += `</div></div>`;
 
   const premMap=[
     {k:'Campeón',rk:'campeon',icon:'🏆'},

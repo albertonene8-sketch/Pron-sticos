@@ -701,11 +701,11 @@ function filterParticipants(v){ buildParticipantsGrid(v); }
 // ═══════════════════════════════════════════════════════
 function calcular() {
   collectAllInputs();
-  const S=getScoring();
-  const real16=new Set();for(let i=1;i<=16;i++){const v=realResults['fase_16vos_'+i];if(v)real16.add(normalizeTeam(v));}
-  const real8=new Set();for(let i=1;i<=8;i++){const v=realResults['fase_8vos_'+i];if(v)real8.add(normalizeTeam(v));}
-  const real4=new Set();for(let i=1;i<=4;i++){const v=realResults['fase_4tos_'+i];if(v)real4.add(normalizeTeam(v));}
-  const realSemis=new Set();for(let i=1;i<=4;i++){const v=realResults['fase_semis_'+i];if(v)realSemis.add(normalizeTeam(v));}
+ const S=getScoring();
+  const real16=new Set();for(let i=1;i<=32;i++){const v=realResults['fase_16vos_'+i];if(v)real16.add(normalizeTeam(v));}
+  const real8=new Set();for(let i=1;i<=16;i++){const v=realResults['fase_8vos_'+i];if(v)real8.add(normalizeTeam(v));}
+  const real4=new Set();for(let i=1;i<=8;i++){const v=realResults['fase_4tos_'+i];if(v)real4.add(normalizeTeam(v));}
+  const realSemis=new Set();for(let i=1;i<=4;i++){const v=realResults['fase_Semis_'+i];if(v)realSemis.add(normalizeTeam(v));}
   const realFinal=new Set();for(let i=1;i<=2;i++){const v=realResults['fase_final_'+i];if(v)realFinal.add(normalizeTeam(v));}
   
   const realCampeon=normalizeTeam(realResults['premio_campeon']||'');

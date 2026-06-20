@@ -426,7 +426,7 @@ async function loadFromCloud() {
     const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN}/latest`, {
       method: 'GET',
       headers: {
-        'X-Master-Key': JSONBIN_KEY,
+        'X-Master-Key': 'X-Access-Key',
         'X-Bin-Meta': 'false'
       }
     });

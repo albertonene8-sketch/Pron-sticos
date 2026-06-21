@@ -21,9 +21,13 @@
   body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
   /* HEADER */
-  .header { background: linear-gradient(135deg, #0d1b2a 0%, #1a3a5c 50%, #0d1b2a 100%); padding: 24px 20px 20px; text-align: center; border-bottom: 2px solid var(--oro); }
-  .header h1 { font-size: 1.8rem; font-weight: 800; letter-spacing: 0.05em; color: var(--oro); text-shadow: 0 0 30px rgba(245,166,35,0.4); }
-  .header p { color: var(--muted); font-size: 0.85rem; margin-top: 4px; }
+  .header { position: relative; padding: 0; border-bottom: 2px solid var(--oro); overflow: hidden; }
+  .header-bg { position: absolute; inset: 0; background-image: url('https://raw.githubusercontent.com/albertonene8-sketch/Pron-sticos/main/banner.jpg'); background-size: cover; background-position: center; filter: brightness(0.5); z-index: 0; }
+  .header-content { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 20px; padding: 40px 20px 34px; }
+  .header-trophy { display: none; }
+  .header-text { text-align: center; }
+  .header h1 { font-size: 1.8rem; font-weight: 800; letter-spacing: 0.05em; color: var(--oro); text-shadow: 0 0 30px rgba(245,166,35,0.6), 0 2px 8px rgba(0,0,0,0.8); }
+  .header p { color: #c8d8e8; font-size: 0.85rem; margin-top: 4px; text-shadow: 0 1px 4px rgba(0,0,0,0.8); }
 
   /* TABS */
   .tabs { display: flex; background: var(--card); border-bottom: 1px solid var(--border); overflow-x: auto; }
@@ -202,8 +206,16 @@
 </div>
 
 <div class="header">
-  <h1>⚽ PRONÓSTICOS MUNDIAL 2026</h1>
-  <p>23 participantes · Clasificación en tiempo real</p>
+  <div class="header-bg"></div>
+  <div class="header-content">
+    <img class="header-trophy" src="https://raw.githubusercontent.com/albertonene8-sketch/Pron-sticos/main/copadelmundo.jpg" alt="Copa del Mundo">
+    <div class="header-text">
+      <h1>⚽ PRONÓSTICOS MUNDIAL 2026</h1>
+      <p>23 participantes · Clasificación en tiempo real</p>
+    </div>
+
+    <img class="header-trophy" src="https://raw.githubusercontent.com/albertonene8-sketch/Pron-sticos/main/copadelmundo.jpg" alt="Copa del Mundo">
+  </div>
 </div>
 
 <div class="tabs" id="tabsBar">
@@ -219,8 +231,10 @@
     <div style="font-size:0.85rem;color:var(--muted)">Actualizado automáticamente</div>
     <button class="btn" onclick="loadFromCloud()">🔄 Actualizar</button>
   </div>
-  <div id="ranking-container">
-    <div class="empty-state"><div class="big">⚽</div><p>Cargando clasificación...</p></div>
+  <div style="display:flex;gap:20px;align-items:flex-start;">
+    <div id="ranking-container" style="flex:1;min-width:0;">
+      <div class="empty-state"><div class="big">⚽</div><p>Cargando clasificación...</p></div>
+    </div>
   </div>
 </div>
 

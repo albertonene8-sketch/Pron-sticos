@@ -223,7 +223,6 @@
 <div class="tabs" id="tabsBar">
   <div class="tab active" onclick="showTab('clasificacion')">🏆 Clasificación</div>
   <div class="tab" onclick="showTab('pronosticos')">📋 Pronósticos</div>
-  <div class="tab" onclick="showTab('grupos')">🌍 Grupos</div>
   <div class="tab admin-only" style="display:none" onclick="showTab('resultados')">📝 Resultados</div>
   <div class="tab admin-only" style="display:none" onclick="showTab('puntuacion')">⚙️ Puntuación</div>
   <div class="tab" id="adminTabBtn" onclick="openAdminLogin()" style="color:var(--muted);margin-left:auto">🔐</div>
@@ -246,10 +245,6 @@
     <input id="searchPart" style="width:100%;max-width:360px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;color:var(--text);font-size:0.9rem" placeholder="Buscar participante..." oninput="filterParticipants(this.value)">
   </div>
   <div id="participants-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px"></div>
-</div>
-
-<div class="section" id="tab-grupos">
-  <div id="grupos-clasificacion" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;margin-top:4px"></div>
 </div>
 
 <div class="section" id="tab-resultados">
@@ -464,8 +459,6 @@ async function loadFromCloud() {
     setSyncStatus('ok', ts ? 'Actualizado: '+ts : 'Conectado · sin resultados aún');
     calcular();
     buildParticipantsGrid();
-  buildGruposClasificacion();
-    buildGruposClasificacion();
   } catch(e) {
     console.error('JSONBin error:', e);
     setSyncStatus('err','Error: '+e.message);
@@ -632,7 +625,7 @@ function buildResultsUI() {
   });
   
   function getAvailableTeams(fase){
-    if(fase==='16vos'){const t=new Set();'ABCDEFGHIJKL'.split('').forEach(g=>{for(let p=1;p<=3;p++){const v=realResults['g_'+g+'_'+p];if(v)t.add(v);}});return Array.from(t).sort();}
+    if(fase==='16vos'){const t=new Set();'ABCDEFGHIJKL'.split('').forEach(g=>{for(let p=1;p<=2;p++){const v=realResults['g_'+g+'_'+p];if(v)t.add(v);}});return Array.from(t).sort();}
     if(fase==='8vos'){const t=new Set();for(let i=1;i<=16;i++){const v=realResults['fase_16vos_'+i];if(v)t.add(v);}return Array.from(t).sort();}
     if(fase==='4tos'){const t=new Set();for(let i=1;i<=8;i++){const v=realResults['fase_8vos_'+i];if(v)t.add(v);}return Array.from(t).sort();}
     if(fase==='semis'){const t=new Set();for(let i=1;i<=4;i++){const v=realResults['fase_4tos_'+i];if(v)t.add(v);}return Array.from(t).sort();}
@@ -696,113 +689,7 @@ function clearResults(){
 // ═══════════════════════════════════════════════════════
 // PARTICIPANTES GRID
 // ═══════════════════════════════════════════════════════
-function buildGruposClasificacion() {
-  const cont = document.getElementById('grupos-clasificacion');
-  if(!cont) return;
-
-  // Construir equipos por grupo desde matches
-  const grupoEquipos = {};
-  const grupoPartidos = {};
-  for(let i=1; i<=72; i++){
-    const m = PRONOSTICOS.matches[String(i)];
-    if(!m) continue;
-    const g = m.grupo;
-    if(!grupoEquipos[g]) grupoEquipos[g] = new Set();
-    grupoEquipos[g].add(m.equipo1);
-    grupoEquipos[g].add(m.equipo2);
-    if(!grupoPartidos[g]) grupoPartidos[g] = [];
-    grupoPartidos[g].push({n:i, e1:m.equipo1, e2:m.equipo2});
-  }
-
-  const grupos = 'ABCDEFGHIJKL'.split('');
-  cont.innerHTML = '';
-
-  grupos.forEach(g => {
-    const equipos = Array.from(grupoEquipos[g]||[]);
-    const stats = {};
-    equipos.forEach(e => { stats[e] = {pj:0,pg:0,pe:0,pp:0,gf:0,gc:0,pts:0}; });
-
-    // Calcular stats con resultados reales
-    (grupoPartidos[g]||[]).forEach(({n, e1, e2}) => {
-      const res = realResults['m_'+n];
-      if(!res) return;
-      const sc = parseScore(res);
-      if(!sc) return;
-      const [g1, g2] = sc;
-      stats[e1].pj++; stats[e2].pj++;
-      stats[e1].gf += g1; stats[e1].gc += g2;
-      stats[e2].gf += g2; stats[e2].gc += g1;
-      if(g1 > g2){ stats[e1].pg++; stats[e1].pts+=3; stats[e2].pp++; }
-      else if(g1 < g2){ stats[e2].pg++; stats[e2].pts+=3; stats[e1].pp++; }
-      else { stats[e1].pe++; stats[e1].pts++; stats[e2].pe++; stats[e2].pts++; }
-    });
-
-    // Función enfrentamiento directo entre dos equipos
-    function enfrentamientoDirecto(e1, e2) {
-      const partido = (grupoPartidos[g]||[]).find(p => 
-        (p.e1===e1 && p.e2===e2) || (p.e1===e2 && p.e2===e1)
-      );
-      if(!partido) return 0;
-      const res = realResults['m_'+partido.n];
-      if(!res) return 0;
-      const sc = parseScore(res);
-      if(!sc) return 0;
-      const [g1, g2] = sc;
-      if(partido.e1===e1) return g1>g2?1:g1<g2?-1:0;
-      return g2>g1?1:g2<g1?-1:0;
-    }
-
-    // Ordenar con desempate
-    const ordenados = equipos.sort((a, b) => {
-      if(stats[b].pts !== stats[a].pts) return stats[b].pts - stats[a].pts;
-      const ed = enfrentamientoDirecto(a, b);
-      if(ed !== 0) return -ed;
-      return stats[b].gf - stats[a].gf;
-    });
-
-    const colores = ['rgba(245,166,35,0.15)', 'rgba(122,147,170,0.1)', 'rgba(205,127,50,0.1)', 'transparent'];
-
-    cont.innerHTML += `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">
-      <div style="background:var(--azul);padding:8px 12px;font-size:0.75rem;font-weight:800;color:var(--oro);letter-spacing:0.1em">GRUPO ${g}</div>
-      <table style="width:100%;border-collapse:collapse;font-size:0.78rem">
-        <thead>
-          <tr style="background:rgba(26,58,92,0.5)">
-            <th style="padding:5px 8px;text-align:left;color:var(--muted);font-weight:600">#</th>
-            <th style="padding:5px 8px;text-align:left;color:var(--muted);font-weight:600">Equipo</th>
-            <th style="padding:5px 4px;text-align:center;color:var(--muted);font-weight:600">PJ</th>
-            <th style="padding:5px 4px;text-align:center;color:var(--muted);font-weight:600">G</th>
-            <th style="padding:5px 4px;text-align:center;color:var(--muted);font-weight:600">E</th>
-            <th style="padding:5px 4px;text-align:center;color:var(--muted);font-weight:600">P</th>
-            <th style="padding:5px 4px;text-align:center;color:var(--muted);font-weight:600">GF</th>
-            <th style="padding:5px 4px;text-align:center;color:var(--muted);font-weight:600">GC</th>
-            <th style="padding:5px 4px;text-align:center;color:var(--muted);font-weight:600">DG</th>
-            <th style="padding:5px 8px;text-align:center;color:var(--oro);font-weight:800">Pts</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${ordenados.map((e,i) => {
-            const s = stats[e];
-            const dg = s.gf - s.gc;
-            return `<tr style="border-top:1px solid var(--border);background:${colores[i]}">
-              <td style="padding:6px 8px;color:${i<2?'var(--oro)':'var(--muted)'};font-weight:700">${i+1}</td>
-              <td style="padding:6px 8px;font-weight:600">${obtenerBandera(e)}${e}</td>
-              <td style="padding:6px 4px;text-align:center;color:var(--muted)">${s.pj}</td>
-              <td style="padding:6px 4px;text-align:center;color:#86efac">${s.pg}</td>
-              <td style="padding:6px 4px;text-align:center;color:var(--muted)">${s.pe}</td>
-              <td style="padding:6px 4px;text-align:center;color:#f87171">${s.pp}</td>
-              <td style="padding:6px 4px;text-align:center;color:var(--muted)">${s.gf}</td>
-              <td style="padding:6px 4px;text-align:center;color:var(--muted)">${s.gc}</td>
-              <td style="padding:6px 4px;text-align:center;color:${dg>0?'#86efac':dg<0?'#f87171':'var(--muted)'}">${dg>0?'+'+dg:dg}</td>
-              <td style="padding:6px 8px;text-align:center;font-weight:800;color:var(--verde)">${s.pts}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>`;
-  });
-}
-
-(filter='') {
+function buildParticipantsGrid(filter='') {
   const grid = document.getElementById('participants-grid');
   if(!grid) return;
   grid.innerHTML='';
@@ -1198,7 +1085,6 @@ function showTab(tab){
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   const el=document.getElementById('tab-'+tab);
   if(el)el.classList.add('active');
-  if(tab==='grupos')buildGruposClasificacion();
   if(tab==='resultados')buildResultsUI();
   if(tab==='pronosticos')buildParticipantsGrid();
 }

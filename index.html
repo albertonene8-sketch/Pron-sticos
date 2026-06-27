@@ -253,11 +253,11 @@
   <div class="match-grid" id="matches-container"></div>
   <div class="fase-header"><h3>🏆 Clasificados por grupo</h3><span class="badge">12 grupos</span></div>
   <div class="grupos-grid" id="grupos-container"></div>
-  <div class="fase-header"><h3>🥊 Dieciseisavos de final</h3><span class="badge">16 equipos</span></div>
+  <div class="fase-header"><h3>🥊 Dieciseisavos de final</h3><span class="badge">32 equipos</span></div>
   <div class="fases-grid" id="16vos-container"></div>
-  <div class="fase-header"><h3>🥊 Octavos de final</h3><span class="badge">8 equipos</span></div>
+  <div class="fase-header"><h3>🥊 Octavos de final</h3><span class="badge">16 equipos</span></div>
   <div class="fases-grid" id="8vos-container"></div>
-  <div class="fase-header"><h3>🥊 Cuartos de final</h3><span class="badge">4 equipos</span></div>
+  <div class="fase-header"><h3>🥊 Cuartos de final</h3><span class="badge">8 equipos</span></div>
   <div class="fases-grid" id="4tos-container"></div>
   <div class="fase-header"><h3>🥊 Semifinales</h3><span class="badge">4 equipos</span></div>
   <div class="fases-grid" id="semis-container"></div>
@@ -519,7 +519,7 @@ function collectAllInputs() {
   for(let i=1;i<=72;i++){const el=document.getElementById('r_m_'+i);if(el)realResults['m_'+i]=el.value.trim();}
   'ABCDEFGHIJKL'.split('').forEach(g=>{for(let p=1;p<=3;p++){const el=document.getElementById('r_g_'+g+'_'+p);if(el)realResults['g_'+g+'_'+p]=el.value;}});
   ['16vos','8vos','4tos','semis','final'].forEach(fase=>{
-    const max=fase==='16vos'?16:fase==='8vos'?8:fase==='4tos'?4:fase==='semis'?4:2;
+    const max=fase==='16vos'?32:fase==='8vos'?16:fase==='4tos'?8:fase==='semis'?4:2;
     for(let i=1;i<=max;i++){const el=document.getElementById('r_fase_'+fase+'_'+i);if(el)realResults['fase_'+fase+'_'+i]=el.value;}
   });
   ['campeon','sub','3er','4to','goleador','portero'].forEach(k=>{const el=document.getElementById('r_premio_'+k);if(el)realResults['premio_'+k]=el.value;});
@@ -626,9 +626,9 @@ function buildResultsUI() {
   
   function getAvailableTeams(fase){
     if(fase==='16vos'){const t=new Set();'ABCDEFGHIJKL'.split('').forEach(g=>{for(let p=1;p<=3;p++){const v=realResults['g_'+g+'_'+p];if(v)t.add(v);}});return Array.from(t).sort();}
-    if(fase==='8vos'){const t=new Set();for(let i=1;i<=16;i++){const v=realResults['fase_16vos_'+i];if(v)t.add(v);}return Array.from(t).sort();}
-    if(fase==='4tos'){const t=new Set();for(let i=1;i<=8;i++){const v=realResults['fase_8vos_'+i];if(v)t.add(v);}return Array.from(t).sort();}
-    if(fase==='semis'){const t=new Set();for(let i=1;i<=4;i++){const v=realResults['fase_4tos_'+i];if(v)t.add(v);}return Array.from(t).sort();}
+    if(fase==='8vos'){const t=new Set();for(let i=1;i<=32;i++){const v=realResults['fase_16vos_'+i];if(v)t.add(v);}return Array.from(t).sort();}
+    if(fase==='4tos'){const t=new Set();for(let i=1;i<=16;i++){const v=realResults['fase_8vos_'+i];if(v)t.add(v);}return Array.from(t).sort();}
+    if(fase==='semis'){const t=new Set();for(let i=1;i<=8;i++){const v=realResults['fase_4tos_'+i];if(v)t.add(v);}return Array.from(t).sort();}
     if(fase==='final'){const t=new Set();for(let i=1;i<=4;i++){const v=realResults['fase_semis_'+i];if(v)t.add(v);}return Array.from(t).sort();}
     return[];
   }
@@ -652,7 +652,7 @@ function buildResultsUI() {
   
   window.refreshFaseSelects=function(){
     'ABCDEFGHIJKL'.split('').forEach(g=>{for(let p=1;p<=3;p++){const el=document.getElementById('r_g_'+g+'_'+p);if(el)realResults['g_'+g+'_'+p]=el.value;}});
-    ['16vos','8vos','4tos','semis','final'].forEach(fase=>{const max=fase==='16vos'?16:fase==='8vos'?8:fase==='4tos'?4:fase==='semis'?4:2;for(let i=1;i<=max;i++){const el=document.getElementById('r_fase_'+fase+'_'+i);if(el)realResults['fase_'+fase+'_'+i]=el.value;}});
+    ['16vos','8vos','4tos','semis','final'].forEach(fase=>{const max=fase==='16vos'?32:fase==='8vos'?16:fase==='4tos'?8:fase==='semis'?4:2;for(let i=1;i<=max;i++){const el=document.getElementById('r_fase_'+fase+'_'+i);if(el)realResults['fase_'+fase+'_'+i]=el.value;}});
     renderFaseContainers();renderPremiosSelects();
   };
   
@@ -716,9 +716,9 @@ function filterParticipants(v){ buildParticipantsGrid(v); }
 function calcular() {
   collectAllInputs();
   const S=getScoring();
-  const real16=new Set();for(let i=1;i<=16;i++){const v=realResults['fase_16vos_'+i];if(v)real16.add(normalizeTeam(v));}
-  const real8=new Set();for(let i=1;i<=8;i++){const v=realResults['fase_8vos_'+i];if(v)real8.add(normalizeTeam(v));}
-  const real4=new Set();for(let i=1;i<=4;i++){const v=realResults['fase_4tos_'+i];if(v)real4.add(normalizeTeam(v));}
+  const real16=new Set();for(let i=1;i<=32;i++){const v=realResults['fase_16vos_'+i];if(v)real16.add(normalizeTeam(v));}
+  const real8=new Set();for(let i=1;i<=16;i++){const v=realResults['fase_8vos_'+i];if(v)real8.add(normalizeTeam(v));}
+  const real4=new Set();for(let i=1;i<=8;i++){const v=realResults['fase_4tos_'+i];if(v)real4.add(normalizeTeam(v));}
   const realSemis=new Set();for(let i=1;i<=4;i++){const v=realResults['fase_semis_'+i];if(v)realSemis.add(normalizeTeam(v));}
   const realFinal=new Set();for(let i=1;i<=2;i++){const v=realResults['fase_final_'+i];if(v)realFinal.add(normalizeTeam(v));}
   
@@ -957,7 +957,7 @@ function showProns(key) {
   });
   const equipos16Sorted = [...new Set(equipos16)].sort((a,b)=>a.localeCompare(b,'es'));
   const real16Set = new Set();
-  for(let i=1;i<=16;i++){const v=realResults['fase_16vos_'+i];if(v)real16Set.add(normalizeTeam(v));}
+  for(let i=1;i<=32;i++){const v=realResults['fase_16vos_'+i];if(v)real16Set.add(normalizeTeam(v));}
 
   html += `<div class="detail-section">
     <h4>🏆 DIECISEISAVOS DE FINAL (CLASIFICADOS DE GRUPO)</h4>

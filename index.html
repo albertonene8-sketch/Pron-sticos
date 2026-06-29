@@ -1414,7 +1414,24 @@ function simSel(key,opts,sel){
   opts.forEach(t=>{o+=`<option value="${t}"${t===sel?' selected':''}>${t}</option>`;});
   return `<select class="sel-drop${sel?' sel-filled':''}" data-simkey="${key}" onchange="simSet(this)">${o}</select>`;
 }
-function simSet(el){simR[el.getAttribute('data-simkey')]=el.value;el.classList.toggle('sel-filled',!!el.value);simRenderTable();}
+function simAvail(fase){
+  if(fase==='8vos'){const t=new Set();for(let i=1;i<=32;i++){const v=simR['fase_16vos_'+i];if(v)t.add(v);}return Array.from(t).sort((a,b)=>a.localeCompare(b,'es'));}
+  if(fase==='4tos'){const t=new Set();for(let i=1;i<=16;i++){const v=simR['fase_8vos_'+i];if(v)t.add(v);}return Array.from(t).sort((a,b)=>a.localeCompare(b,'es'));}
+  if(fase==='semis'){const t=new Set();for(let i=1;i<=8;i++){const v=simR['fase_4tos_'+i];if(v)t.add(v);}return Array.from(t).sort((a,b)=>a.localeCompare(b,'es'));}
+  if(fase==='final'){const t=new Set();for(let i=1;i<=4;i++){const v=simR['fase_semis_'+i];if(v)t.add(v);}return Array.from(t).sort((a,b)=>a.localeCompare(b,'es'));}
+  return [];
+}
+function simPrune(){
+  let av=new Set(simAvail('8vos'));for(let i=1;i<=16;i++){const k='fase_8vos_'+i;if(simR[k]&&!av.has(simR[k]))delete simR[k];}
+  av=new Set(simAvail('4tos'));for(let i=1;i<=8;i++){const k='fase_4tos_'+i;if(simR[k]&&!av.has(simR[k]))delete simR[k];}
+  av=new Set(simAvail('semis'));for(let i=1;i<=4;i++){const k='fase_semis_'+i;if(simR[k]&&!av.has(simR[k]))delete simR[k];}
+  av=new Set(simAvail('final'));for(let i=1;i<=2;i++){const k='fase_final_'+i;if(simR[k]&&!av.has(simR[k]))delete simR[k];}
+}
+function simSet(el){
+  const key=el.getAttribute('data-simkey');simR[key]=el.value;
+  if(key.indexOf('premio_')===0){simRenderTable();}
+  else{const y=window.scrollY;simRenderAll();window.scrollTo(0,y);}
+}
 function simComputeRanking(R){
   const S=getScoring();
   const r16=new Set();for(let i=1;i<=32;i++){const v=R['fase_16vos_'+i];if(v)r16.add(normalizeTeam(v));}
@@ -1477,13 +1494,14 @@ function simRenderInputs(){
     h+='</div>';
   });
   h+='</div>';
-  [{label:'🥊 Dieciseisavos de final (32 equipos)',pre:'fase_16vos_',n:32},
-   {label:'🥊 Octavos de final (16 equipos)',pre:'fase_8vos_',n:16},
-   {label:'🥊 Cuartos de final (8 equipos)',pre:'fase_4tos_',n:8},
-   {label:'🥊 Semifinales (4 equipos)',pre:'fase_semis_',n:4},
-   {label:'🥊 Final (2 equipos)',pre:'fase_final_',n:2}].forEach(r=>{
+  [{label:'🥊 Dieciseisavos de final (32 equipos)',pre:'fase_16vos_',n:32,av:null},
+   {label:'🥊 Octavos de final (16 equipos)',pre:'fase_8vos_',n:16,av:'8vos'},
+   {label:'🥊 Cuartos de final (8 equipos)',pre:'fase_4tos_',n:8,av:'4tos'},
+   {label:'🥊 Semifinales (4 equipos)',pre:'fase_semis_',n:4,av:'semis'},
+   {label:'🥊 Final (2 equipos)',pre:'fase_final_',n:2,av:'final'}].forEach(r=>{
+    const opts=r.av?simAvail(r.av):allT;
     h+=`<div class="fase-header"><h3>${r.label}</h3></div><div class="fases-grid">`;
-    for(let i=1;i<=r.n;i++){const key=r.pre+i;h+=`<div class="fase-item"><span class="fase-num">${i}</span>${simSel(key,allT,simR[key]||'')}</div>`;}
+    for(let i=1;i<=r.n;i++){const key=r.pre+i;h+=`<div class="fase-item"><span class="fase-num">${i}</span>${simSel(key,opts,simR[key]||'')}</div>`;}
     h+='</div>';
   });
   const gol=simListField('Goleador'),por=simListField('Portero');
